@@ -235,6 +235,7 @@ class SettingsFragment : PreferenceFragmentCompat() {
                 dialog.dismiss()
             }
             .show()
+    }
 
     @Suppress("DEPRECATION")
     override fun onDisplayPreferenceDialog(preference: Preference) {
