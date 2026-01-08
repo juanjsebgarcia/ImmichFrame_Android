@@ -136,14 +136,13 @@ class SettingsFragment : PreferenceFragmentCompat() {
 
             // Only show Toast + auto-return on Android 9 and below
             if (Build.VERSION.SDK_INT <= Build.VERSION_CODES.P) {
-                Toast.makeText(context, "Returning to app in 2 minutes…", Toast.LENGTH_LONG).show()
+                Toast.makeText(context, "Short press power button to return, or wait 2 minutes for auto-return", Toast.LENGTH_LONG).show()
 
-                // Schedule return after 2 minutes
-                Handler(Looper.getMainLooper()).postDelayed({
-                    val returnIntent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-                    returnIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    context.startActivity(returnIntent)
-                }, 2 * 60 * 1000)
+                // Start the power button listener service
+                PowerButtonReturnService.start(context)
+
+                // Schedule return after 2 minutes using AlarmManager (backup if power button not pressed)
+                SettingsTimeoutReceiver.scheduleTimeout(context)
             }
 
             // Launch Android settings
