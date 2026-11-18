@@ -56,6 +56,7 @@ import retrofit2.Callback
 import retrofit2.Response
 import retrofit2.Retrofit
 import java.text.SimpleDateFormat
+import org.json.JSONArray
 import org.json.JSONObject
 import java.util.Calendar
 import java.util.Locale
@@ -120,6 +121,8 @@ class MainActivity : AppCompatActivity() {
     // Set when the user pauses a video, so status can tell a paused video from a loading one
     private var isVideoPausedByUser = false
     private var currentVideoId: String? = null
+    // The photos on screen: two when splitview has paired a couple of portraits
+    private var displayedImages: List<Helpers.ImageResponse> = emptyList()
     // Bumped on every settings load so api/Asset responses from an earlier session are dropped
     private var assetQueueGeneration = 0
     // Bumped when a video starts so image decodes still running in showImage() are dropped
@@ -338,6 +341,11 @@ class MainActivity : AppCompatActivity() {
     ) {
         val imageViewOld = if (isShowingFirst) imageView1 else imageView2
         val imageViewNew = if (isShowingFirst) imageView2 else imageView1
+        displayedImages = if (isMerged && mergedPortrait != null) {
+            listOf(mergedPortrait, imageResponse)
+        } else {
+            listOf(imageResponse)
+        }
 
         zoomAnimator?.cancel()
         imageViewNew.alpha = 0f
@@ -1059,6 +1067,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Identifies a photo by its content, so a caller can tell when the picture has changed.
+     * The server gives photos no identifier of their own, and a date and location are
+     * neither unique nor always present. This is not an Immich asset id.
+     */
+    private fun imageFingerprint(image: Helpers.ImageResponse): String {
+        val data = image.randomImageBase64
+        // String caches its hash, so this is only worked out once per photo
+        return String.format(Locale.ROOT, "%08x%06x", data.hashCode(), data.length and 0xffffff)
+    }
+
     private fun isSlideshowPaused(): Boolean {
         return if (isPlayingVideo) isVideoPausedByUser else !isImageTimerRunning
     }
@@ -1102,17 +1121,24 @@ class MainActivity : AppCompatActivity() {
         // Whether the slideshow has stopped advancing. In WebView mode the web app keeps
         // its own pause state, which is not visible from here, so it is reported as null.
         val paused: Any = if (useWebView) JSONObject.NULL else isSlideshowPaused()
-        // What is on screen. The server gives photos a date and location but no identifier,
-        // so only videos can be identified. Not known in WebView mode.
-        val image = currentImage
+        // What is on screen, as a list because splitview shows two photos at once.
+        // Not known in WebView mode.
         val media: Any = when {
             useWebView -> JSONObject.NULL
-            isPlayingVideo -> JSONObject().put("type", "video").put("id", currentVideoId)
-            image != null -> JSONObject()
-                .put("type", "image")
-                .put("date", image.photoDate)
-                .put("location", image.imageLocation)
-            else -> JSONObject.NULL
+            isPlayingVideo -> JSONArray().put(
+                JSONObject().put("type", "video").put("id", currentVideoId)
+            )
+            else -> JSONArray().also { list ->
+                displayedImages.forEach { image ->
+                    list.put(
+                        JSONObject()
+                            .put("type", "image")
+                            .put("fingerprint", imageFingerprint(image))
+                            .put("date", image.photoDate)
+                            .put("location", image.imageLocation)
+                    )
+                }
+            }
         }
         return JSONObject()
             .put("version", versionName)
