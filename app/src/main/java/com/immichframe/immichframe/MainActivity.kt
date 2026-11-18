@@ -85,6 +85,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var serverSettings: Helpers.ServerSettings
     private var retrofit: Retrofit? = null
     private lateinit var apiService: Helpers.ApiService
+    private lateinit var rpcDiscovery: RpcDiscovery
     private lateinit var rcpServer: RpcHttpServer
     private val createdAt = SystemClock.elapsedRealtime()
     // Keeps trying until the RPC port is bound, rather than crashing or silently giving up
@@ -235,6 +236,8 @@ class MainActivity : AppCompatActivity() {
             onStatusRequest = { statusForRpc() },
         )
         rpcStartRunnable.run()
+
+        rpcDiscovery = RpcDiscovery(this)
 
         registerReceiver(
             screenStateReceiver,
@@ -719,6 +722,12 @@ class MainActivity : AppCompatActivity() {
         var savedUrl = prefs.getString("webview_url", "") ?: ""
         useWebView = prefs.getBoolean("useWebView", true)
         val authSecret = prefs.getString("authSecret", "") ?: ""
+        // Here rather than in onCreate so that a renamed frame is re-advertised straight away
+        rpcDiscovery.register(
+            name = prefs.getString("frameName", "") ?: "",
+            port = rcpServer.listeningPort,
+            version = packageManager.getPackageInfo(packageName, 0).versionName,
+        )
         val settingsLock = prefs.getBoolean("settingsLock", false)
         val activeTimes = prefs.getBoolean("activeTimes", false)
 
@@ -1353,6 +1362,7 @@ class MainActivity : AppCompatActivity() {
         rcpServer.stop()
         stopVideo()
         unregisterReceiver(screenStateReceiver)
+        rpcDiscovery.unregister()
         handler.removeCallbacksAndMessages(null)
     }
 
