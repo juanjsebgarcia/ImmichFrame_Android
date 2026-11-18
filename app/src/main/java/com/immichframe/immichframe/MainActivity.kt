@@ -1064,7 +1064,10 @@ class MainActivity : AppCompatActivity() {
             .put("brightness", brightness)
             .put("mode", if (useWebView) "webview" else "native")
             // isPlayingVideo only marks the slideshow's video slot, and stays set while paused
-            .put("playingVideo", isPlayingVideo && videoView.isPlaying)
+            .put(
+                "playingVideo",
+                isPlayingVideo && if (isVideoFiltered) filteredVideoView.isPlaying else videoView.isPlaying,
+            )
             .put("uptimeSeconds", (SystemClock.elapsedRealtime() - createdAt) / 1000)
             .toString()
     }
